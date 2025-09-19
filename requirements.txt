@@ -11,4 +11,5 @@ pillow>=9.0.0
 wordcloud>=1.8.0
 nltk>=3.8.0
 spacy>=3.7.0
+textblob>=0.17.1
 transformers>=4.30.0
