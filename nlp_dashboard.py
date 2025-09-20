@@ -114,6 +114,7 @@ def main():
     sections = {
         "🏠 Introduction": "intro",
         "🔧 Text Preprocessing": "preprocessing", 
+        "🎯 Word Embeddings": "embeddings",
         "💭 Sentiment Analysis": "sentiment",
         "📝 Text Summarization": "summarization",
         "🏷️ Named Entity Recognition": "ner",

@@ -61,13 +61,6 @@ st.markdown("""
         margin: 0.5rem 0;
     }
     
-    .code-section {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 5px;
-        margin: 1rem 0;
-    }
-    
     .stButton > button {
         background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -594,189 +587,482 @@ elif current_section == "demo":
         
         if st.button("🏋️ Train Model", type="primary"):
             with st.spinner("Loading and preprocessing data..."):
-                # Load data
-                (x_train, y_train, x_test, y_test), (y_train_cat, y_test_cat), num_classes = load_and_preprocess_data(dataset_choice)
-                
-                # Create model
-                input_shape = x_train.shape[1]
-                model = create_model(architecture_choice, input_shape, num_classes)
-                
-                # Display model summary
-                st.markdown("#### 🔍 Model Architecture")
-                model_summary = []
-                model.summary(print_fn=lambda x: model_summary.append(x))
-                st.text('\n'.join(model_summary))
-                
-                # Train model
-                st.markdown("#### 🎯 Training Progress")
-                progress_bar = st.progress(0)
-                
-                # Create placeholder for live training metrics
-                metrics_placeholder = st.empty()
-                chart_placeholder = st.empty()
-                
-                # Custom callback for live updates
-                class LiveTrainingCallback(keras.callbacks.Callback):
-                    def __init__(self):
-                        self.losses = []
-                        self.accuracies = []
-                        self.val_losses = []
-                        self.val_accuracies = []
+                try:
+                    # Load data
+                    (x_train, y_train, x_test, y_test), (y_train_cat, y_test_cat), num_classes = load_and_preprocess_data(dataset_choice)
                     
-                    def on_epoch_end(self, epoch, logs=None):
-                        self.losses.append(logs.get('loss'))
-                        self.accuracies.append(logs.get('accuracy'))
-                        self.val_losses.append(logs.get('val_loss'))
-                        self.val_accuracies.append(logs.get('val_accuracy'))
+                    # Create model
+                    input_shape = x_train.shape[1]
+                    model = create_model(architecture_choice, input_shape, num_classes)
+                    
+                    # Display model summary
+                    st.markdown("#### 🔍 Model Architecture")
+                    model_summary = []
+                    model.summary(print_fn=lambda x: model_summary.append(x))
+                    st.text('\n'.join(model_summary))
+                    
+                    # Train model
+                    st.markdown("#### 🎯 Training Progress")
+                    progress_bar = st.progress(0)
+                    
+                    # Create placeholder for live training metrics
+                    metrics_placeholder = st.empty()
+                    chart_placeholder = st.empty()
+                    
+                    # Custom callback for live updates
+                    class LiveTrainingCallback(keras.callbacks.Callback):
+                        def __init__(self):
+                            self.losses = []
+                            self.accuracies = []
+                            self.val_losses = []
+                            self.val_accuracies = []
                         
-                        # Update progress bar
-                        progress = (epoch + 1) / epochs
-                        progress_bar.progress(progress)
-                        
-                        # Update metrics display
-                        with metrics_placeholder.container():
-                            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                        def on_epoch_end(self, epoch, logs=None):
+                            self.losses.append(logs.get('loss'))
+                            self.accuracies.append(logs.get('accuracy'))
+                            self.val_losses.append(logs.get('val_loss'))
+                            self.val_accuracies.append(logs.get('val_accuracy'))
                             
-                            with metric_col1:
-                                st.metric("Loss", f"{logs.get('loss', 0):.4f}")
-                            with metric_col2:
-                                st.metric("Accuracy", f"{logs.get('accuracy', 0):.4f}")
-                            with metric_col3:
-                                st.metric("Val Loss", f"{logs.get('val_loss', 0):.4f}")
-                            with metric_col4:
-                                st.metric("Val Accuracy", f"{logs.get('val_accuracy', 0):.4f}")
-                        
-                        # Update training chart
-                        if epoch > 0:  # Skip first epoch for better visualization
-                            fig = make_subplots(
-                                rows=1, cols=2,
-                                subplot_titles=['Loss', 'Accuracy']
-                            )
+                            # Update progress bar
+                            progress = (epoch + 1) / epochs
+                            progress_bar.progress(progress)
                             
-                            epochs_range = list(range(1, len(self.losses) + 1))
+                            # Update metrics display
+                            with metrics_placeholder.container():
+                                metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+                                
+                                with metric_col1:
+                                    st.metric("Loss", f"{logs.get('loss', 0):.4f}")
+                                with metric_col2:
+                                    st.metric("Accuracy", f"{logs.get('accuracy', 0):.4f}")
+                                with metric_col3:
+                                    st.metric("Val Loss", f"{logs.get('val_loss', 0):.4f}")
+                                with metric_col4:
+                                    st.metric("Val Accuracy", f"{logs.get('val_accuracy', 0):.4f}")
                             
-                            # Loss plot
-                            fig.add_trace(
-                                go.Scatter(x=epochs_range, y=self.losses, name='Training Loss', line=dict(color='#e74c3c')),
-                                row=1, col=1
-                            )
-                            fig.add_trace(
-                                go.Scatter(x=epochs_range, y=self.val_losses, name='Validation Loss', line=dict(color='#c0392b')),
-                                row=1, col=1
-                            )
-                            
-                            # Accuracy plot
-                            fig.add_trace(
-                                go.Scatter(x=epochs_range, y=self.accuracies, name='Training Accuracy', line=dict(color='#2ecc71')),
-                                row=1, col=2
-                            )
-                            fig.add_trace(
-                                go.Scatter(x=epochs_range, y=self.val_accuracies, name='Validation Accuracy', line=dict(color='#27ae60')),
-                                row=1, col=2
-                            )
-                            
-                            fig.update_layout(height=400, showlegend=True)
-                            fig.update_xaxes(title_text="Epoch")
-                            fig.update_yaxes(title_text="Loss", row=1, col=1)
-                            fig.update_yaxes(title_text="Accuracy", row=1, col=2)
-                            
-                            chart_placeholder.plotly_chart(fig, use_container_width=True)
-                
-                # Initialize callback
-                callback = LiveTrainingCallback()
-                
-                # Compile model with specified learning rate
-                model.compile(
-                    optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
-                    loss='categorical_crossentropy',
-                    metrics=['accuracy']
-                )
-                
-                # Train the model
-                history = model.fit(
-                    x_train, y_train_cat,
-                    epochs=epochs,
-                    batch_size=batch_size,
-                    validation_split=validation_split,
-                    callbacks=[callback],
-                    verbose=0
-                )
-                
-                # Store results in session state
-                st.session_state.trained_model = model
-                st.session_state.training_history = history
-                st.session_state.model_trained = True
-                st.session_state.test_data = (x_test, y_test, y_test_cat)
-                st.session_state.dataset_choice = dataset_choice
-                
-                st.success("🎉 Model trained successfully!")
+                            # Update training chart
+                            if epoch > 0:  # Skip first epoch for better visualization
+                                fig = make_subplots(
+                                    rows=1, cols=2,
+                                    subplot_titles=['Loss', 'Accuracy']
+                                )
+                                
+                                epochs_range = list(range(1, len(self.losses) + 1))
+                                
+                                # Loss plot
+                                fig.add_trace(
+                                    go.Scatter(x=epochs_range, y=self.losses, name='Training Loss', line=dict(color='#e74c3c')),
+                                    row=1, col=1
+                                )
+                                fig.add_trace(
+                                    go.Scatter(x=epochs_range, y=self.val_losses, name='Validation Loss', line=dict(color='#c0392b')),
+                                    row=1, col=1
+                                )
+                                
+                                # Accuracy plot
+                                fig.add_trace(
+                                    go.Scatter(x=epochs_range, y=self.accuracies, name='Training Accuracy', line=dict(color='#2ecc71')),
+                                    row=1, col=2
+                                )
+                                fig.add_trace(
+                                    go.Scatter(x=epochs_range, y=self.val_accuracies, name='Validation Accuracy', line=dict(color='#27ae60')),
+                                    row=1, col=2
+                                )
+                                
+                                fig.update_layout(height=400, showlegend=True)
+                                fig.update_xaxes(title_text="Epoch")
+                                fig.update_yaxes(title_text="Loss", row=1, col=1)
+                                fig.update_yaxes(title_text="Accuracy", row=1, col=2)
+                                
+                                chart_placeholder.plotly_chart(fig, use_container_width=True)
+                    
+                    # Initialize callback
+                    callback = LiveTrainingCallback()
+                    
+                    # Compile model with specified learning rate
+                    model.compile(
+                        optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
+                        loss='categorical_crossentropy',
+                        metrics=['accuracy']
+                    )
+                    
+                    # Train the model
+                    history = model.fit(
+                        x_train, y_train_cat,
+                        epochs=epochs,
+                        batch_size=batch_size,
+                        validation_split=validation_split,
+                        callbacks=[callback],
+                        verbose=0
+                    )
+                    
+                    # Store results in session state
+                    st.session_state.trained_model = model
+                    st.session_state.training_history = history
+                    st.session_state.model_trained = True
+                    st.session_state.test_data = (x_test, y_test, y_test_cat)
+                    st.session_state.dataset_choice = dataset_choice
+                    
+                    st.success("🎉 Model trained successfully!")
+                    
+                except Exception as e:
+                    st.error(f"Error during training: {str(e)}")
         
         # Model prediction demo
         if st.session_state.model_trained:
             st.markdown("#### 🔮 Test Predictions")
             
             if st.button("🎲 Random Prediction"):
-                x_test, y_test, y_test_cat = st.session_state.test_data
-                
-                # Get random sample
-                idx = np.random.randint(0, len(x_test))
-                sample = x_test[idx:idx+1]
-                true_label = y_test[idx]
-                
-                # Make prediction
-                prediction = st.session_state.trained_model.predict(sample, verbose=0)
-                predicted_label = np.argmax(prediction)
-                confidence = np.max(prediction) * 100
-                
-                # Display results
-                pred_col1, pred_col2 = st.columns(2)
-                
-                with pred_col1:
-                    # Visualize the sample
-                    if st.session_state.dataset_choice == "MNIST":
-                        image = sample.reshape(28, 28)
-                        fig = px.imshow(image, color_continuous_scale='gray', title="Input Image")
-                    elif st.session_state.dataset_choice == "Fashion-MNIST":
-                        image = sample.reshape(28, 28)
-                        fig = px.imshow(image, color_continuous_scale='gray', title="Input Image")
-                    else:  # CIFAR-10
-                        image = sample.reshape(32, 32, 3)
-                        fig = px.imshow(image, title="Input Image")
+                try:
+                    x_test, y_test, y_test_cat = st.session_state.test_data
                     
-                    fig.update_layout(height=300)
+                    # Get random sample
+                    idx = np.random.randint(0, len(x_test))
+                    sample = x_test[idx:idx+1]
+                    true_label = y_test[idx]
+                    
+                    # Make prediction
+                    prediction = st.session_state.trained_model.predict(sample, verbose=0)
+                    predicted_label = np.argmax(prediction)
+                    confidence = np.max(prediction) * 100
+                    
+                    # Display results
+                    pred_col1, pred_col2 = st.columns(2)
+                    
+                    with pred_col1:
+                        # Visualize the sample
+                        if st.session_state.dataset_choice == "MNIST":
+                            image = sample.reshape(28, 28)
+                            fig = px.imshow(image, color_continuous_scale='gray', title="Input Image")
+                        elif st.session_state.dataset_choice == "Fashion-MNIST":
+                            image = sample.reshape(28, 28)
+                            fig = px.imshow(image, color_continuous_scale='gray', title="Input Image")
+                        else:  # CIFAR-10
+                            image = sample.reshape(32, 32, 3)
+                            fig = px.imshow(image, title="Input Image")
+                        
+                        fig.update_layout(height=300)
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with pred_col2:
+                        st.markdown(f"**True Label:** {true_label}")
+                        st.markdown(f"**Predicted Label:** {predicted_label}")
+                        st.markdown(f"**Confidence:** {confidence:.1f}%")
+                        
+                        if true_label == predicted_label:
+                            st.success("✅ Correct Prediction!")
+                        else:
+                            st.error("❌ Incorrect Prediction")
+                        
+                        # Show prediction probabilities
+                        prob_data = pd.DataFrame({
+                            'Class': range(len(prediction[0])),
+                            'Probability': prediction[0]
+                        })
+                        
+                        fig = px.bar(prob_data, x='Class', y='Probability', 
+                                   title="Prediction Probabilities")
+                        fig.update_layout(height=300)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                except Exception as e:
+                    st.error(f"Error making prediction: {str(e)}")
+
+# Section: Model Evaluation
+elif current_section == "evaluation":
+    st.markdown('<h2 class="section-header">📈 Model Evaluation & Metrics</h2>', unsafe_allow_html=True)
+    
+    if not st.session_state.model_trained:
+        st.warning("⚠️ Please train a model first in the Interactive Demo section!")
+        st.markdown("### 📚 Evaluation Metrics Overview")
+        
+        # Show evaluation concepts even without trained model
+        eval_concepts = {
+            "🎯 Accuracy": "Percentage of correct predictions",
+            "📊 Precision": "True Positives / (True Positives + False Positives)",
+            "📈 Recall": "True Positives / (True Positives + False Negatives)",
+            "🎪 F1-Score": "Harmonic mean of Precision and Recall",
+            "📉 Loss": "Measure of prediction error",
+            "🔄 Confusion Matrix": "Table showing actual vs predicted classifications",
+            "📈 ROC Curve": "Trade-off between True Positive Rate and False Positive Rate"
+        }
+        
+        for metric, description in eval_concepts.items():
+            st.markdown(f"**{metric}**: {description}")
+    
+    else:
+        try:
+            # Comprehensive evaluation of trained model
+            x_test, y_test, y_test_cat = st.session_state.test_data
+            model = st.session_state.trained_model
+            
+            # Make predictions
+            with st.spinner("Evaluating model performance..."):
+                y_pred = model.predict(x_test, verbose=0)
+                y_pred_classes = np.argmax(y_pred, axis=1)
+                
+                # Calculate metrics
+                test_loss, test_accuracy = model.evaluate(x_test, y_test_cat, verbose=0)
+            
+            # Display key metrics
+            st.markdown("### 📊 Overall Performance")
+            
+            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+            
+            with metric_col1:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>🎯 Test Accuracy</h3>
+                    <h2>{test_accuracy * 100:.2f}%</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with metric_col2:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>📉 Test Loss</h3>
+                    <h2>{test_loss:.4f}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with metric_col3:
+                precision = len(y_test[y_test == y_pred_classes]) / len(y_test)
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>📊 Precision</h3>
+                    <h2>{precision * 100:.2f}%</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with metric_col4:
+                num_classes = len(np.unique(y_test))
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>🏷️ Classes</h3>
+                    <h2>{num_classes}</h2>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Detailed analysis
+            analysis_col1, analysis_col2 = st.columns(2)
+            
+            with analysis_col1:
+                st.markdown("### 🔄 Confusion Matrix")
+                
+                # Calculate confusion matrix
+                cm = confusion_matrix(y_test, y_pred_classes)
+                
+                # Create heatmap
+                fig = px.imshow(cm, 
+                              text_auto=True, 
+                              aspect="auto",
+                              color_continuous_scale='Blues',
+                              title="Confusion Matrix")
+                fig.update_layout(
+                    xaxis_title="Predicted Label",
+                    yaxis_title="True Label",
+                    height=400
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Interpretation
+                st.markdown("""
+                **How to read:**
+                - Diagonal elements: Correct predictions
+                - Off-diagonal: Misclassifications
+                - Darker colors: Higher values
+                """)
+            
+            with analysis_col2:
+                st.markdown("### 📈 Training History")
+                
+                if st.session_state.training_history:
+                    history = st.session_state.training_history.history
+                    
+                    fig = make_subplots(
+                        rows=2, cols=1,
+                        subplot_titles=['Model Loss', 'Model Accuracy']
+                    )
+                    
+                    epochs_range = list(range(1, len(history['loss']) + 1))
+                    
+                    # Loss subplot
+                    fig.add_trace(
+                        go.Scatter(x=epochs_range, y=history['loss'], name='Training Loss'),
+                        row=1, col=1
+                    )
+                    if 'val_loss' in history:
+                        fig.add_trace(
+                            go.Scatter(x=epochs_range, y=history['val_loss'], name='Validation Loss'),
+                            row=1, col=1
+                        )
+                    
+                    # Accuracy subplot
+                    fig.add_trace(
+                        go.Scatter(x=epochs_range, y=history['accuracy'], name='Training Accuracy'),
+                        row=2, col=1
+                    )
+                    if 'val_accuracy' in history:
+                        fig.add_trace(
+                            go.Scatter(x=epochs_range, y=history['val_accuracy'], name='Validation Accuracy'),
+                            row=2, col=1
+                        )
+                    
+                    fig.update_xaxes(title_text="Epoch", row=2, col=1)
+                    fig.update_yaxes(title_text="Loss", row=1, col=1)
+                    fig.update_yaxes(title_text="Accuracy", row=2, col=1)
+                    fig.update_layout(height=500)
+                    
                     st.plotly_chart(fig, use_container_width=True)
+            
+            # ROC Curve (for multiclass)
+            st.markdown("### 📈 ROC Curves (One-vs-Rest)")
+            
+            try:
+                # Convert to binary format for ROC calculation
+                lb = LabelBinarizer()
+                y_test_binary = lb.fit_transform(y_test)
+                
+                # If binary classification, reshape
+                if y_test_binary.shape[1] == 1:
+                    y_test_binary = np.hstack([1-y_test_binary, y_test_binary])
+                
+                fig = go.Figure()
+                
+                # Calculate ROC for each class
+                for i in range(min(y_test_binary.shape[1], 10)):  # Limit to 10 classes for visibility
+                    if y_test_binary.shape[1] > i:
+                        fpr, tpr, _ = roc_curve(y_test_binary[:, i], y_pred[:, i])
+                        roc_auc = auc(fpr, tpr)
+                        
+                        fig.add_trace(go.Scatter(
+                            x=fpr, y=tpr,
+                            name=f'Class {i} (AUC = {roc_auc:.2f})',
+                            mode='lines'
+                        ))
+                
+                # Add diagonal line
+                fig.add_trace(go.Scatter(
+                    x=[0, 1], y=[0, 1],
+                    mode='lines',
+                    line=dict(dash='dash', color='gray'),
+                    name='Random Classifier'
+                ))
+                
+                fig.update_layout(
+                    title='ROC Curves for Each Class',
+                    xaxis_title='False Positive Rate',
+                    yaxis_title='True Positive Rate',
+                    height=500
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            
+            except Exception as e:
+                st.warning(f"Could not generate ROC curves: {str(e)}")
+            
+            # Classification Report
+            st.markdown("### 📋 Detailed Classification Report")
+            
+            try:
+                report = classification_report(y_test, y_pred_classes, output_dict=True)
+                
+                # Convert to DataFrame for better visualization
+                report_df = pd.DataFrame(report).transpose()
+                report_df = report_df.round(3)
+                
+                # Style the dataframe
+                st.dataframe(
+                    report_df,
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.warning(f"Could not generate classification report: {str(e)}")
+                
+        except Exception as e:
+            st.error(f"Error in evaluation: {str(e)}")
+
+# Section: Real-World Applications
+elif current_section == "applications":
+    st.markdown('<h2 class="section-header">🌍 Real-World Applications</h2>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    ### 🚀 Deep Learning in Action
+    
+    Deep Learning has revolutionized numerous industries and applications. 
+    Let's explore some of the most impactful use cases!
+    """)
+    
+    # Application categories
+    app_tabs = st.tabs([
+        "🖼️ Computer Vision", 
+        "🗣️ Natural Language", 
+        "🎵 Audio & Speech", 
+        "🎮 Gaming & Robotics",
+        "🏥 Healthcare",
+        "🚗 Autonomous Systems"
+    ])
+    
+    with app_tabs[0]:  # Computer Vision
+        st.markdown("### 🖼️ Computer Vision Applications")
         
-        # Success stories
-        st.markdown("#### 🏆 Notable Success Stories")
+        cv_col1, cv_col2 = st.columns(2)
         
-        success_col1, success_col2, success_col3 = st.columns(3)
-        
-        with success_col1:
+        with cv_col1:
             st.markdown("""
-            **🔬 Medical Diagnosis**
-            - Skin cancer detection (dermatology)
-            - Diabetic retinopathy screening
-            - COVID-19 X-ray analysis
-            - Drug discovery acceleration
+            **📱 Image Classification**
+            - Photo tagging and organization
+            - Medical image diagnosis
+            - Quality control in manufacturing
+            - Content moderation
+            
+            **🎯 Object Detection**
+            - Autonomous vehicle navigation
+            - Security and surveillance
+            - Retail inventory management
+            - Sports analytics
+            
+            **🎨 Image Generation**
+            - Art creation and style transfer
+            - Photo enhancement and restoration
+            - Synthetic data generation
+            - Fashion design assistance
             """)
         
-        with success_col2:
-            st.markdown("""
-            **🌾 Agriculture**
-            - Crop disease identification
-            - Yield prediction
-            - Pest detection
-            - Precision farming
-            """)
-        
-        with success_col3:
-            st.markdown("""
-            **🏭 Manufacturing**
-            - Defect detection
-            - Quality assurance
-            - Predictive maintenance
-            - Supply chain optimization
-            """)
+        with cv_col2:
+            # Create a sample computer vision workflow
+            st.markdown("#### 🔍 CV Pipeline Example")
+            
+            cv_pipeline = {
+                'Stage': ['Input Image', 'Preprocessing', 'Feature Extraction', 'Classification', 'Output'],
+                'Description': [
+                    'Raw pixel data',
+                    'Resize, normalize',
+                    'Convolution layers',
+                    'Dense layers',
+                    'Predicted class'
+                ],
+                'Size': [224*224*3, 224*224*3, 7*7*512, 1000, 1]
+            }
+            
+            pipeline_df = pd.DataFrame(cv_pipeline)
+            
+            fig = go.Figure(data=go.Scatter(
+                x=pipeline_df['Stage'],
+                y=pipeline_df['Size'],
+                mode='markers+lines',
+                marker=dict(size=15, color='#3498db'),
+                line=dict(width=3)
+            ))
+            
+            fig.update_layout(
+                title="Computer Vision Processing Pipeline",
+                xaxis_title="Processing Stage",
+                yaxis_title="Data Size",
+                height=300
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
     
     with app_tabs[1]:  # Natural Language Processing
         st.markdown("### 🗣️ Natural Language Processing")
@@ -824,6 +1110,199 @@ elif current_section == "demo":
                 yaxis_title="Parameters (Billions)",
                 height=400
             )
+            
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with app_tabs[2]:  # Audio & Speech
+        st.markdown("### 🎵 Audio & Speech Processing")
+        
+        audio_col1, audio_col2 = st.columns(2)
+        
+        with audio_col1:
+            st.markdown("""
+            **🎤 Speech Recognition**
+            - Voice assistants (Siri, Alexa)
+            - Transcription services
+            - Voice-controlled applications
+            - Accessibility tools
+            
+            **🎵 Music Analysis**
+            - Music recommendation systems
+            - Genre classification
+            - Beat detection and tempo analysis
+            - Audio fingerprinting
+            
+            **🔊 Audio Generation**
+            - Text-to-speech synthesis
+            - Music composition
+            - Voice cloning
+            - Sound effect generation
+            """)
+        
+        with audio_col2:
+            # Audio processing visualization
+            st.markdown("#### 🎵 Audio Processing Stages")
+            
+            # Simulate audio waveform
+            time = np.linspace(0, 1, 1000)
+            signal = np.sin(2 * np.pi * 5 * time) + 0.5 * np.sin(2 * np.pi * 10 * time)
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=time, y=signal, mode='lines', name='Audio Signal'))
+            fig.update_layout(
+                title="Sample Audio Waveform",
+                xaxis_title="Time (seconds)",
+                yaxis_title="Amplitude",
+                height=300
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with app_tabs[3]:  # Gaming & Robotics
+        st.markdown("### 🎮 Gaming & Robotics")
+        
+        gaming_col1, gaming_col2 = st.columns(2)
+        
+        with gaming_col1:
+            st.markdown("""
+            **🎮 Game AI**
+            - AlphaGo, AlphaStar
+            - Non-player character (NPC) behavior
+            - Procedural content generation
+            - Player behavior analysis
+            
+            **🤖 Robotics**
+            - Robot navigation and mapping
+            - Manipulation and grasping
+            - Human-robot interaction
+            - Industrial automation
+            
+            **🎯 Decision Making**
+            - Reinforcement learning agents
+            - Multi-agent systems
+            - Strategic planning
+            - Real-time adaptation
+            """)
+        
+        with gaming_col2:
+            # Gaming milestones
+            st.markdown("#### 🏆 AI Gaming Milestones")
+            
+            gaming_data = {
+                'Year': [1997, 2016, 2017, 2019, 2020],
+                'Achievement': ['Deep Blue beats Kasparov', 'AlphaGo beats Lee Sedol', 'AlphaStar (StarCraft)', 'OpenAI Five (Dota 2)', 'Agent57 (Atari)'],
+                'Impact': [8, 9, 9, 8, 7]
+            }
+            
+            fig = px.bar(gaming_data, x='Year', y='Impact', 
+                        hover_data=['Achievement'],
+                        title="AI Gaming Breakthroughs")
+            fig.update_layout(height=300)
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with app_tabs[4]:  # Healthcare
+        st.markdown("### 🏥 Healthcare Applications")
+        
+        health_col1, health_col2 = st.columns(2)
+        
+        with health_col1:
+            st.markdown("""
+            **🔬 Medical Imaging**
+            - X-ray and CT scan analysis
+            - MRI interpretation
+            - Skin cancer detection
+            - Retinal disease diagnosis
+            
+            **💊 Drug Discovery**
+            - Molecular property prediction
+            - Drug-target interaction
+            - Clinical trial optimization
+            - Personalized medicine
+            
+            **🩺 Clinical Decision Support**
+            - Electronic health records analysis
+            - Risk prediction models
+            - Treatment recommendation
+            - Early warning systems
+            """)
+        
+        with health_col2:
+            # Healthcare impact visualization
+            st.markdown("#### 📊 Healthcare AI Impact")
+            
+            health_metrics = {
+                'Area': ['Radiology', 'Drug Discovery', 'Diagnosis', 'Surgery', 'Monitoring'],
+                'Accuracy_Improvement': [25, 40, 30, 20, 35],
+                'Time_Reduction': [50, 60, 40, 30, 45]
+            }
+            
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=health_metrics['Area'], y=health_metrics['Accuracy_Improvement'], 
+                                name='Accuracy Improvement (%)', marker_color='#3498db'))
+            fig.add_trace(go.Bar(x=health_metrics['Area'], y=health_metrics['Time_Reduction'], 
+                                name='Time Reduction (%)', marker_color='#e74c3c'))
+            
+            fig.update_layout(
+                title="AI Impact in Healthcare",
+                xaxis_title="Medical Area",
+                yaxis_title="Improvement (%)",
+                barmode='group',
+                height=400
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with app_tabs[5]:  # Autonomous Systems
+        st.markdown("### 🚗 Autonomous Systems")
+        
+        auto_col1, auto_col2 = st.columns(2)
+        
+        with auto_col1:
+            st.markdown("""
+            **🚗 Autonomous Vehicles**
+            - Tesla Autopilot, Waymo
+            - Lane detection and following
+            - Object detection and avoidance
+            - Route planning and navigation
+            
+            **✈️ Drones and UAVs**
+            - Package delivery
+            - Search and rescue operations
+            - Agricultural monitoring
+            - Infrastructure inspection
+            
+            **🚢 Maritime Systems**
+            - Autonomous ships
+            - Port automation
+            - Underwater exploration
+            - Marine life monitoring
+            """)
+        
+        with auto_col2:
+            # Autonomous vehicle sensors
+            st.markdown("#### 📡 AV Sensor Fusion")
+            
+            sensor_data = {
+                'Sensor': ['Camera', 'LiDAR', 'Radar', 'GPS', 'IMU'],
+                'Range_m': [100, 200, 150, 1000, 0],
+                'Accuracy': [0.9, 0.95, 0.85, 0.7, 0.8]
+            }
+            
+            fig = make_subplots(specs=[[{"secondary_y": True}]])
+            
+            fig.add_trace(
+                go.Bar(x=sensor_data['Sensor'], y=sensor_data['Range_m'], name="Range (m)"),
+                secondary_y=False,
+            )
+            
+            fig.add_trace(
+                go.Scatter(x=sensor_data['Sensor'], y=sensor_data['Accuracy'], 
+                          mode='lines+markers', name="Accuracy", marker_color='red'),
+                secondary_y=True,
+            )
+            
+            fig.update_xaxes(title_text="Sensor Type")
+            fig.update_yaxes(title_text="Range (meters)", secondary_y=False)
+            fig.update_yaxes(title_text="Accuracy", secondary_y=True)
+            fig.update_layout(title="Autonomous Vehicle Sensors")
             
             st.plotly_chart(fig, use_container_width=True)
 
@@ -1201,308 +1680,3 @@ st.markdown("""
     <p>Keep learning and building amazing AI systems! 🚀</p>
 </div>
 """, unsafe_allow_html=True)
-                
-                pred_col2.markdown(f"**True Label:** {true_label}")
-                pred_col2.markdown(f"**Predicted Label:** {predicted_label}")
-                pred_col2.markdown(f"**Confidence:** {confidence:.1f}%")
-                
-                if true_label == predicted_label:
-                    pred_col2.success("✅ Correct Prediction!")
-                else:
-                    pred_col2.error("❌ Incorrect Prediction")
-                
-                # Show prediction probabilities
-                prob_data = pd.DataFrame({
-                    'Class': range(len(prediction[0])),
-                    'Probability': prediction[0]
-                })
-                
-                fig = px.bar(prob_data, x='Class', y='Probability', 
-                           title="Prediction Probabilities")
-                fig.update_layout(height=300)
-                pred_col2.plotly_chart(fig, use_container_width=True)
-
-# Section: Model Evaluation
-elif current_section == "evaluation":
-    st.markdown('<h2 class="section-header">📈 Model Evaluation & Metrics</h2>', unsafe_allow_html=True)
-    
-    if not st.session_state.model_trained:
-        st.warning("⚠️ Please train a model first in the Interactive Demo section!")
-        st.markdown("### 📚 Evaluation Metrics Overview")
-        
-        # Show evaluation concepts even without trained model
-        eval_concepts = {
-            "🎯 Accuracy": "Percentage of correct predictions",
-            "📊 Precision": "True Positives / (True Positives + False Positives)",
-            "📈 Recall": "True Positives / (True Positives + False Negatives)",
-            "🎪 F1-Score": "Harmonic mean of Precision and Recall",
-            "📉 Loss": "Measure of prediction error",
-            "🔄 Confusion Matrix": "Table showing actual vs predicted classifications",
-            "📈 ROC Curve": "Trade-off between True Positive Rate and False Positive Rate"
-        }
-        
-        for metric, description in eval_concepts.items():
-            st.markdown(f"**{metric}**: {description}")
-    
-    else:
-        # Comprehensive evaluation of trained model
-        x_test, y_test, y_test_cat = st.session_state.test_data
-        model = st.session_state.trained_model
-        
-        # Make predictions
-        with st.spinner("Evaluating model performance..."):
-            y_pred = model.predict(x_test, verbose=0)
-            y_pred_classes = np.argmax(y_pred, axis=1)
-            
-            # Calculate metrics
-            test_loss, test_accuracy = model.evaluate(x_test, y_test_cat, verbose=0)
-        
-        # Display key metrics
-        st.markdown("### 📊 Overall Performance")
-        
-        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-        
-        with metric_col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>🎯 Test Accuracy</h3>
-                <h2>{test_accuracy * 100:.2f}%</h2>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with metric_col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>📉 Test Loss</h3>
-                <h2>{test_loss:.4f}</h2>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with metric_col3:
-            precision = len(y_test[y_test == y_pred_classes]) / len(y_test)
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>📊 Precision</h3>
-                <h2>{precision * 100:.2f}%</h2>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with metric_col4:
-            num_classes = len(np.unique(y_test))
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3>🏷️ Classes</h3>
-                <h2>{num_classes}</h2>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Detailed analysis
-        analysis_col1, analysis_col2 = st.columns(2)
-        
-        with analysis_col1:
-            st.markdown("### 🔄 Confusion Matrix")
-            
-            # Calculate confusion matrix
-            cm = confusion_matrix(y_test, y_pred_classes)
-            
-            # Create heatmap
-            fig = px.imshow(cm, 
-                          text_auto=True, 
-                          aspect="auto",
-                          color_continuous_scale='Blues',
-                          title="Confusion Matrix")
-            fig.update_layout(
-                xaxis_title="Predicted Label",
-                yaxis_title="True Label",
-                height=400
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Interpretation
-            st.markdown("""
-            **How to read:**
-            - Diagonal elements: Correct predictions
-            - Off-diagonal: Misclassifications
-            - Darker colors: Higher values
-            """)
-        
-        with analysis_col2:
-            st.markdown("### 📈 Training History")
-            
-            if st.session_state.training_history:
-                history = st.session_state.training_history.history
-                
-                fig = make_subplots(
-                    rows=2, cols=1,
-                    subplot_titles=['Model Loss', 'Model Accuracy']
-                )
-                
-                epochs_range = list(range(1, len(history['loss']) + 1))
-                
-                # Loss subplot
-                fig.add_trace(
-                    go.Scatter(x=epochs_range, y=history['loss'], name='Training Loss'),
-                    row=1, col=1
-                )
-                if 'val_loss' in history:
-                    fig.add_trace(
-                        go.Scatter(x=epochs_range, y=history['val_loss'], name='Validation Loss'),
-                        row=1, col=1
-                    )
-                
-                # Accuracy subplot
-                fig.add_trace(
-                    go.Scatter(x=epochs_range, y=history['accuracy'], name='Training Accuracy'),
-                    row=2, col=1
-                )
-                if 'val_accuracy' in history:
-                    fig.add_trace(
-                        go.Scatter(x=epochs_range, y=history['val_accuracy'], name='Validation Accuracy'),
-                        row=2, col=1
-                    )
-                
-                fig.update_xaxes(title_text="Epoch", row=2, col=1)
-                fig.update_yaxes(title_text="Loss", row=1, col=1)
-                fig.update_yaxes(title_text="Accuracy", row=2, col=1)
-                fig.update_layout(height=500)
-                
-                st.plotly_chart(fig, use_container_width=True)
-        
-        # ROC Curve (for multiclass)
-        st.markdown("### 📈 ROC Curves (One-vs-Rest)")
-        
-        # Convert to binary format for ROC calculation
-        lb = LabelBinarizer()
-        y_test_binary = lb.fit_transform(y_test)
-        
-        # If binary classification, reshape
-        if y_test_binary.shape[1] == 1:
-            y_test_binary = np.hstack([1-y_test_binary, y_test_binary])
-        
-        fig = go.Figure()
-        
-        # Calculate ROC for each class
-        for i in range(min(y_test_binary.shape[1], 10)):  # Limit to 10 classes for visibility
-            if y_test_binary.shape[1] > i:
-                fpr, tpr, _ = roc_curve(y_test_binary[:, i], y_pred[:, i])
-                roc_auc = auc(fpr, tpr)
-                
-                fig.add_trace(go.Scatter(
-                    x=fpr, y=tpr,
-                    name=f'Class {i} (AUC = {roc_auc:.2f})',
-                    mode='lines'
-                ))
-        
-        # Add diagonal line
-        fig.add_trace(go.Scatter(
-            x=[0, 1], y=[0, 1],
-            mode='lines',
-            line=dict(dash='dash', color='gray'),
-            name='Random Classifier'
-        ))
-        
-        fig.update_layout(
-            title='ROC Curves for Each Class',
-            xaxis_title='False Positive Rate',
-            yaxis_title='True Positive Rate',
-            height=500
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Classification Report
-        st.markdown("### 📋 Detailed Classification Report")
-        
-        report = classification_report(y_test, y_pred_classes, output_dict=True)
-        
-        # Convert to DataFrame for better visualization
-        report_df = pd.DataFrame(report).transpose()
-        report_df = report_df.round(3)
-        
-        # Style the dataframe
-        st.dataframe(
-            report_df,
-            use_container_width=True
-        )
-
-# Section: Real-World Applications
-elif current_section == "applications":
-    st.markdown('<h2 class="section-header">🌍 Real-World Applications</h2>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    ### 🚀 Deep Learning in Action
-    
-    Deep Learning has revolutionized numerous industries and applications. 
-    Let's explore some of the most impactful use cases!
-    """)
-    
-    # Application categories
-    app_tabs = st.tabs([
-        "🖼️ Computer Vision", 
-        "🗣️ Natural Language", 
-        "🎵 Audio & Speech", 
-        "🎮 Gaming & Robotics",
-        "🏥 Healthcare",
-        "🚗 Autonomous Systems"
-    ])
-    
-    with app_tabs[0]:  # Computer Vision
-        st.markdown("### 🖼️ Computer Vision Applications")
-        
-        cv_col1, cv_col2 = st.columns(2)
-        
-        with cv_col1:
-            st.markdown("""
-            **📱 Image Classification**
-            - Photo tagging and organization
-            - Medical image diagnosis
-            - Quality control in manufacturing
-            - Content moderation
-            
-            **🎯 Object Detection**
-            - Autonomous vehicle navigation
-            - Security and surveillance
-            - Retail inventory management
-            - Sports analytics
-            
-            **🎨 Image Generation**
-            - Art creation and style transfer
-            - Photo enhancement and restoration
-            - Synthetic data generation
-            - Fashion design assistance
-            """)
-        
-        with cv_col2:
-            # Create a sample computer vision workflow
-            st.markdown("#### 🔍 CV Pipeline Example")
-            
-            cv_pipeline = {
-                'Stage': ['Input Image', 'Preprocessing', 'Feature Extraction', 'Classification', 'Output'],
-                'Description': [
-                    'Raw pixel data',
-                    'Resize, normalize',
-                    'Convolution layers',
-                    'Dense layers',
-                    'Predicted class'
-                ],
-                'Size': [224*224*3, 224*224*3, 7*7*512, 1000, 1]
-            }
-            
-            pipeline_df = pd.DataFrame(cv_pipeline)
-            
-            fig = go.Figure(data=go.Scatter(
-                x=pipeline_df['Stage'],
-                y=pipeline_df['Size'],
-                mode='markers+lines',
-                marker=dict(size=15, color='#3498db'),
-                line=dict(width=3)
-            ))
-            
-            fig.update_layout(
-                title="Computer Vision Processing Pipeline",
-                xaxis_title="Processing Stage",
-                yaxis_title="Data Size",
-                height=300
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
