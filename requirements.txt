@@ -13,4 +13,3 @@ nltk>=3.8.0
 spacy>=3.7.0
 textblob>=0.17.1
 transformers>=4.30.0
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.6.0/en_core_web_sm-3.6.0-py3-none-any.whl
