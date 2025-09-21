@@ -8,13 +8,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import nltk
+nltk.download("punkt_tab")  # for your code
+
+import spacy
+spacy.cli.download("en_core_web_sm")
+
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.tokenize import word_tokenize, sent_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-import spacy
 from textblob import TextBlob
 import re
 import warnings
