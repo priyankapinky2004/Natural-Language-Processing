@@ -20,21 +20,63 @@ import re
 import warnings
 warnings.filterwarnings('ignore')
 
-# Download required NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
+# Download required NLTK data with better error handling
+@st.cache_resource
+def setup_nltk():
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        try:
+            nltk.download('punkt', quiet=True)
+        except:
+            pass
     
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
-    
-try:
-    nltk.data.find('corpora/wordnet')
-except LookupError:
-    nltk.download('wordnet')
+    try:
+        nltk.data.find('tokenizers/punkt_tab')
+    except LookupError:
+        try:
+            nltk.download('punkt_tab', quiet=True)
+        except:
+            pass
+            
+    try:
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        try:
+            nltk.download('stopwords', quiet=True)
+        except:
+            pass
+            
+    try:
+        nltk.data.find('corpora/wordnet')
+    except LookupError:
+        try:
+            nltk.download('wordnet', quiet=True)
+        except:
+            pass
+
+# Safe tokenization functions
+def safe_word_tokenize(text):
+    """Safe word tokenization with fallback"""
+    try:
+        return word_tokenize(text)
+    except:
+        # Fallback to simple splitting
+        import string
+        # Remove punctuation and split
+        translator = str.maketrans('', '', string.punctuation)
+        clean_text = text.translate(translator)
+        return clean_text.split()
+
+def safe_sent_tokenize(text):
+    """Safe sentence tokenization with fallback"""
+    try:
+        return sent_tokenize(text)
+    except:
+        # Fallback to simple sentence splitting
+        import re
+        sentences = re.split(r'[.!?]+', text)
+        return [s.strip() for s in sentences if s.strip()]
 
 # Load spaCy model (fallback if not installed)
 @st.cache_resource
@@ -52,6 +94,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Setup NLTK data
+setup_nltk()
 
 # Custom CSS for better styling
 st.markdown("""
@@ -256,7 +301,7 @@ def show_preprocessing():
             st.markdown("### 📊 Processing Statistics")
             
             # Original text stats
-            original_tokens = word_tokenize(input_text)
+            original_tokens = safe_word_tokenize(input_text)
             original_chars = len(input_text)
             original_words = len(original_tokens)
             
@@ -269,13 +314,25 @@ def show_preprocessing():
             if remove_punctuation:
                 processed_text = re.sub(r'[^\w\s]', '', processed_text)
             
-            tokens = word_tokenize(processed_text)
+            tokens = safe_word_tokenize(processed_text)
             
             if remove_numbers:
                 tokens = [token for token in tokens if not token.isdigit()]
             
             if remove_stopwords:
-                stop_words = set(stopwords.words('english'))
+                try:
+                    stop_words = set(stopwords.words('english'))
+                except:
+                    # Fallback stopwords list
+                    stop_words = {'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your', 'yours', 
+                                 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 
+                                 'herself', 'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
+                                 'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those', 'am', 'is', 'are',
+                                 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does',
+                                 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until',
+                                 'while', 'of', 'at', 'by', 'for', 'with', 'through', 'during', 'before', 'after',
+                                 'above', 'below', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
+                                 'further', 'then', 'once'}
                 tokens = [token for token in tokens if token.lower() not in stop_words]
             
             if apply_stemming:
@@ -561,7 +618,7 @@ def show_sentiment_analysis():
         st.plotly_chart(fig, use_container_width=True)
         
         # Sentence-level sentiment analysis
-        sentences = sent_tokenize(input_text)
+        sentences = safe_sent_tokenize(input_text)
         if len(sentences) > 1:
             st.subheader("📊 Sentence-Level Sentiment Breakdown")
             
@@ -589,7 +646,7 @@ def show_sentiment_analysis():
         
         # Word-level sentiment contribution
         st.subheader("🔍 Word-Level Sentiment Analysis")
-        words = word_tokenize(input_text.lower())
+        words = safe_word_tokenize(input_text.lower())
         words = [word for word in words if word.isalpha()]
         
         word_sentiments = []
@@ -673,13 +730,13 @@ def show_summarization():
         
         with col2:
             st.markdown("### 📊 Document Statistics")
-            sentences = sent_tokenize(input_text)
-            words = word_tokenize(input_text)
+            sentences = safe_sent_tokenize(input_text)
+            words = safe_word_tokenize(input_text)
             
             stats = {
                 "Total Sentences": len(sentences),
                 "Total Words": len(words),
-                "Average Words/Sentence": round(len(words) / len(sentences), 1),
+                "Average Words/Sentence": round(len(words) / len(sentences), 1) if len(sentences) > 0 else 0,
                 "Target Summary Length": f"{int(len(words) * summary_length / 100)} words"
             }
             
